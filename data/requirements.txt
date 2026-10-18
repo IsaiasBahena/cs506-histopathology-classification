@@ -1,2 +1,4 @@
-zenodo-get
+pillow
 remotezip
+scikit_learn
+zenodo-get
