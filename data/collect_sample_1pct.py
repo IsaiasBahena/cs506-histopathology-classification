@@ -1,7 +1,7 @@
 from itertools import chain
 from remotezip import RemoteZip
 
-def extract_train_1pct():
+def extract_nct_1pct():
     url = "https://zenodo.org/records/1214456/files/NCT-CRC-HE-100K.zip"
     with RemoteZip(url, initial_buffer_size=12*1024*1024) as zip:
         infolist = zip.infolist()
@@ -11,7 +11,7 @@ def extract_train_1pct():
         infolist[85692:85836]):
             zip.extract(zip_info.filename, path="./sample_1pct")
 
-def extract_test_1pct():
+def extract_val_1pct():
     url = "https://zenodo.org/records/1214456/files/CRC-VAL-HE-7K.zip"
     with RemoteZip(url, initial_buffer_size=1024*1024) as zip:
         infolist = zip.infolist()
@@ -21,5 +21,5 @@ def extract_test_1pct():
         infolist[5956:5969]):
             zip.extract(zip_info.filename, path="./sample_1pct")
 
-extract_train_1pct()
-extract_test_1pct()
+extract_nct_1pct()
+extract_val_1pct()

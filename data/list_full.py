@@ -1,6 +1,6 @@
 from remotezip import RemoteZip
 
-def list_train():
+def list_nct():
     url = "https://zenodo.org/records/1214456/files/NCT-CRC-HE-100K.zip"
     with RemoteZip(url, initial_buffer_size=12*1024*1024) as zip:
         infolist = zip.infolist()
@@ -8,7 +8,7 @@ def list_train():
             for zip_info in infolist:
                 f.write(zip_info.filename + "\n")
 
-def list_test():
+def list_val():
     url = "https://zenodo.org/records/1214456/files/CRC-VAL-HE-7K.zip"
     with RemoteZip(url, initial_buffer_size=1024*1024) as zip:
         infolist = zip.infolist()
@@ -16,5 +16,5 @@ def list_test():
             for zip_info in infolist:
                 f.write(zip_info.filename + "\n")
 
-list_train()
-list_test()
+list_nct()
+list_val()
