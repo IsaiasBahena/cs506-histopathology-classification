@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CS 506 histopathology datasets
+/data/full/
+/data/sample_1pct/
+/data/sample_10pct/
