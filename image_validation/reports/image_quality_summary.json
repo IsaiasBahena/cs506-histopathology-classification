@@ -1,0 +1,19 @@
+{
+    "validation_timestamp_utc": "2026-10-20T21:42:26.870212+00:00",
+    "total_images": 107180,
+    "images_per_dataset": {
+        "NCT-CRC-HE-100K": 100000,
+        "CRC-VAL-HE-7K": 7180
+    },
+    "validation_results": {
+        "metadata_issues": 0,
+        "missing_metadata": 0,
+        "duplicate_metadata": 0,
+        "unreadable_images": 0,
+        "file_access_errors": 0,
+        "invalid_dimensions": 0,
+        "invalid_color_modes": 0,
+        "exact_duplicate_images": 0,
+        "pixel_identical_duplicate_images": 0
+    }
+}
