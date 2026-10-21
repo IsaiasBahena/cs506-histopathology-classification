@@ -221,3 +221,6 @@ __marimo__/
 /data/full/
 /data/sample_1pct/
 /data/sample_10pct/
+
+# Generated preprocessing arrays
+/preprocessing/output/

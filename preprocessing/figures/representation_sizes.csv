@@ -1,0 +1,4 @@
+resolution,array_shape,features,bytes_per_image_uint8,bytes_per_image_float32,sample_matrix_mb_float32,full_nct_gb_float32
+224x224,"(224, 224, 3)",150528,150528,602112,599.7,60.21
+64x64,"(64, 64, 3)",12288,12288,49152,49.0,4.92
+32x32,"(32, 32, 3)",3072,3072,12288,12.2,1.23
