@@ -39,3 +39,13 @@ This will add "count_full.txt" to the "full" directory. This contains class/tota
 python3 build_metadata_full.py
 ```
 This will add "image_metadata.csv" to the "full" directory. This contains the id, path, class, dataset source, width, height, and color mode of every image.
+
+```
+python3 create_train_val_split.py
+```
+This will add "train.csv" and "val.csv" to the "full" directory. These are the 80% train, 20% validation sets created using a seeded, stratified split on the NCT directory. The VAL directory is reserved for final testing.
+
+## Citations
+David Völgyes. (2020, February 20). Zenodo_get: a downloader for Zenodo records (Version 3.1.0). Zenodo. https://doi.org/10.5281/zenodo.1261812
+
+Kather, J. N., Halama, N., & Marx, A. (2018). 100,000 histological images of human colorectal cancer and healthy tissue (Version v0.1) [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.1214456
