@@ -1,3 +1,4 @@
+pandas
 pillow
 remotezip
 scikit_learn
