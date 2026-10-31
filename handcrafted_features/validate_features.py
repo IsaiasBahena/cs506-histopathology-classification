@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from glcm import get_glcm_feature_names
+from lbp import get_lbp_feature_names, LBP_SCALES
 
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
@@ -34,6 +35,9 @@ def get_validation_config(method, bins):
 
     if method == "glcm":
         return OUTPUT_DIR / "glcm.csv", get_glcm_feature_names()
+
+    if method == "lbp":
+        return OUTPUT_DIR / "lbp.csv", get_lbp_feature_names()
 
     raise ValueError(f"Unsupported method: {method}")
 
@@ -152,6 +156,56 @@ def validate_features(method, bins=16):
             "Some GLCM features are constant across all images."
         )
 
+    elif method == "lbp":
+        print("\nLBP histogram validation:")
+
+        assert np.all(features >= 0), (
+            "Negative LBP histogram values found."
+        )
+
+        start = 0
+
+        for neighbors, radius in LBP_SCALES:
+            num_bins = neighbors + 2
+            end = start + num_bins
+
+            histograms = features[:, start:end]
+            histogram_sums = histograms.sum(axis=1)
+
+            print(f"\nScale: P={neighbors}, R={radius}")
+            print("Histogram bins:", num_bins)
+            print("Minimum histogram sum:", histogram_sums.min())
+            print("Maximum histogram sums:", histogram_sums.max())
+
+            assert np.allclose(
+                histogram_sums, 1.0, atol=1e-5
+            ), (
+                f"LBP histogram normalization failed "
+                f"for P={neighbors}, R={radius}."
+            )
+
+            start = end
+
+        assert start == features.shape[1], (
+            "LBP feature count does not match the configured scales."
+        )
+
+        feature_std = features.std(axis=0)
+
+        constant_features = [
+            feature_names[i]
+            for i in np.where(feature_std < 1e-10)[0]
+        ]
+
+        print("\nConstant LBP features:", len(constant_features))
+
+        if constant_features:
+            print("Constant columns:", constant_features)
+
+        assert not constant_features, (
+            "Some LBP features are constant across all images."
+        )
+
     print("\nAll validation checks passed!")
 
 
@@ -161,7 +215,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--method",
-        choices=["rgb_histogram", "glcm"],
+        choices=["rgb_histogram", "glcm", "lbp"],
         required=True,
     )
     parser.add_argument("--bins", type=int, default=16)

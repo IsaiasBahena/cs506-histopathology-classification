@@ -58,6 +58,57 @@ The resulting feature vector contains:
 
 Energy and ASM are mathematically related, but both are retained in the initial representation for comparison.
 
+### Local Binary Patterns (LBP)
+
+Local Binary Patterns describe local image texture by comparing the intensity of each pixel with the intensities of neighboring pixels.
+
+For each center pixel, neighboring intensities are compared against the center intensity. Neighbors with intensities greater than or equal to the center receive a binary value of 1, while neighbors with lower intensities receive 0.
+
+The resulting binary pattern characterizes the local intensity structure surrounding the pixel.
+
+The current implementation uses multi-scale, rotation-invariant uniform LBP.
+
+**Configuration:**
+
+- **Input:** Original 224 × 224 images converted to grayscale
+- **Method:** Uniform LBP (`uniform`)
+- **Neighborhoods:** Circular neighborhoods
+- **Scales:** Three combinations of neighboring points and radii
+- **Aggregation:** Normalized histograms of LBP codes
+- **Normalization:** Each scale's histogram is independently normalized to sum to 1
+
+The three scales are:
+
+| Neighbors (P) | Radius (R) | Histogram Bins |
+|---:|---:|---:|
+| 8 | 1 | 10 |
+| 16 | 2 | 18 |
+| 24 | 3 | 26 |
+| **Total** | | **54** |
+
+The number of histogram bins for uniform LBP is `P + 2`.
+
+Uniform LBP groups local binary patterns according to their structure, with patterns containing more than two circular binary transitions grouped into a single nonuniform category.
+
+The `uniform` method is rotation-invariant, allowing equivalent local patterns under rotation to share the same representation.
+
+For each scale:
+
+1. Compute an LBP code for every pixel in the grayscale image.
+2. Construct a histogram counting the frequency of each LBP code.
+3. Normalize the histogram so its values sum to 1.
+4. Append the normalized histogram to the feature vector.
+
+The three histograms are concatenated into a single feature vector:
+
+10 + 18 + 26 = **54 features per image**
+
+Using multiple radii allows the representation to capture local texture patterns at different spatial scales.
+
+Unlike GLCM, which summarizes statistical relationships between pairs of grayscale intensities, LBP describes local arrangements of relative pixel intensities.
+
+LBP features are computed independently of tissue labels and do not explicitly identify biological structures.
+
 ### Combined Feature Representations
 
 The currently implemented feature extractors produce:
@@ -66,9 +117,10 @@ The currently implemented feature extractors produce:
 |---|---:|
 | RGB histograms | 48 |
 | GLCM texture | 36 |
-| **Total** | **84** |
+| LBP texture | 54 |
+| **Total** | **138** |
 
-These features are currently stored in separate CSV files. They can be combined using image identifiers and dataset information to create an 84-dimensional feature representation.
+These features are currently stored in separate CSV files. They can be combined using image identifiers and dataset information to create a 138-dimensional feature representation.
 
 The combined feature matrix has not yet been generated or validated.
 
@@ -81,6 +133,7 @@ handcrafted_features/
 ├── extract_features.py
 ├── rgb_histogram.py
 ├── glcm.py
+├── lbp.py
 ├── validate_features.py
 └── outputs/
 ```
@@ -88,7 +141,8 @@ handcrafted_features/
 - `extract_features.py`: Reads metadata, processes images in batches, and saves feature matrices.
 - `rgb_histogram.py`: Calculates normalized RGB histograms for individual images.
 - `glcm.py`: Computes GLCM texture statistics and generates feature names.
-- `validate_features.py`: Validates extracted handcrafted feature matrices, including RGB histograms and GLCM texture features.
+- `lbp.py`: Computes multi-scale uniform LBP histograms and generates feature names.
+- `validate_features.py`: Validates extracted handcrafted feature matrices, including RGB histograms, GLCM, and LBP features.
 - `outputs/`: Stores generated feature matrices and extraction progress files. This directory is excluded from Git.
 
 ## Installation
@@ -145,6 +199,30 @@ handcrafted_features/outputs/glcm.progress.json
 
 The output contains 107,180 rows and 40 columns: four metadata columns and 36 GLCM features.
 
+### LBP Feature Extraction
+
+To extract multi-scale uniform LBP features from all images, run:
+
+```bash
+python handcrafted_features/extract_features.py --method lbp --batch-size 1000
+```
+
+The script saves the extracted features to:
+
+```text
+handcrafted_features/outputs/lbp.csv
+```
+
+Extraction progress is recorded in:
+
+```text
+handcrafted_features/outputs/lbp.progress.json
+```
+
+The output contains 107,180 rows and 58 columns: four metadata columns and 54 LBP features.
+
+Each image is represented by three normalized LBP histograms corresponding to the configured neighborhood scales.
+
 ### Checkpointing
 
 Features are saved after each batch. If extraction is interrupted, rerunning the same command attempts to resume from the last saved checkpoint.
@@ -198,6 +276,54 @@ glcm_d2_homogeneity_std
 glcm_d4_correlation_mean
 glcm_d4_correlation_std
 ```
+
+Each image is represented by one row.
+
+### LBP Output
+
+The LBP CSV contains 107,180 rows and 58 columns.
+
+The first four columns contain image metadata:
+
+- `id`
+- `path`
+- `label`
+- `dataset`
+
+The remaining 54 columns contain normalized LBP histogram values.
+
+Column names follow the pattern:
+
+```text
+lbp_p{neighbors}_r{radius}_hist_{bin}
+```
+
+Examples:
+
+```text
+lbp_p8_r1_hist_000
+lbp_p8_r1_hist_001
+...
+lbp_p8_r1_hist_009
+
+lbp_p16_r2_hist_000
+...
+lbp_p16_r2_hist_017
+
+lbp_p24_r3_hist_000
+...
+lbp_p24_r3_hist_025
+```
+
+The features are organized into three consecutive groups:
+
+| Feature Group | Number of Columns | Histogram Bin Indices |
+|---|---:|---|
+| P=8, R=1 | 10 | 0–9 |
+| P=16, R=2 | 18 | 0–17 |
+| P=24, R=3 | 26 | 0–25 |
+
+Each group is independently normalized so that its histogram values sum to approximately 1.
 
 Each image is represented by one row.
 
@@ -287,6 +413,68 @@ All extracted GLCM features satisfied their expected numerical constraints.
 
 The validation also confirmed that none of the 36 GLCM feature columns were constant across the dataset.
 
+### LBP Validation
+
+Run the LBP validation script from the repository root:
+
+```bash
+python handcrafted_features/validate_features.py --method lbp
+```
+
+The validation checks include:
+
+- Expected dataset dimensions and class distributions
+- Missing values
+- Non-finite feature values
+- Duplicate image paths
+- Nonnegative histogram values
+- Independent normalization of all three LBP histograms
+- Constant features across the dataset
+
+For each image, the validator checks that the 10-bin, 18-bin, and 26-bin histograms independently sum to approximately 1.
+
+A numerical tolerance is used to account for floating-point rounding errors.
+
+### Completed LBP Extraction
+
+| Metric | Result |
+|---|---:|
+| Images processed | 107,180 |
+| Features per image | 54 |
+| Output columns | 58 |
+| Extraction time | 121.48 minutes |
+| Average processing rate | 14.71 images/second |
+| Missing values | 0 |
+| Non-finite features | 0 |
+| Duplicate image paths | 0 |
+| Constant features | 0 |
+| Validation | All checks passed |
+
+The observed histogram normalization ranges were:
+
+| Configuration | Histogram Bins | Minimum Sum | Maximum Sum |
+|---|---:|---:|---:|
+| P=8, R=1 | 10 | 0.9999999295 | 1.0000000681 |
+| P=16, R=2 | 18 | 0.9999999371 | 1.0000000620 |
+| P=24, R=3 | 26 | 0.9999999270 | 1.0000000717 |
+
+All three LBP histograms were normalized correctly within the configured numerical tolerance.
+
+The small deviations from exactly 1 are consistent with floating-point rounding.
+
+The validation confirmed that none of the 54 LBP feature columns were constant across the dataset.
+
+### Overall Extraction Summary
+
+| Feature Family | Features | Extraction Time | Validation |
+|---|---:|---:|---|
+| RGB histograms | 48 | 25.89 minutes | Passed |
+| GLCM | 36 | 25.93 minutes | Passed |
+| LBP | 54 | 121.48 minutes | Passed |
+| **Total** | **138** | **173.30 minutes** | **All passed** |
+
+The three feature families have been extracted and validated independently across all 107,180 images.
+
 These checks confirm the structural and numerical validity of the feature matrices, but classification experiments are still required to evaluate their predictive usefulness.
 
 ## Modeling Considerations
@@ -301,11 +489,16 @@ The project's current internal training/validation split is image-level rather t
 
 Different feature families may have substantially different numerical scales. Standardization should therefore be considered when combining feature representations, particularly for distance-based classifiers and clustering algorithms.
 
+RGB histograms describe color distributions, while GLCM and LBP provide complementary texture representations.
+
+GLCM measures statistical relationships between pixel intensities at specified distances and directions, whereas LBP describes the distribution of local binary intensity patterns.
+
+These representations should be evaluated individually and in combination to determine whether combining color and texture information improves classification or clustering performance.
+
 ## Planned Features
 
 Future implementations may include:
 
-- Local Binary Patterns (LBP)
 - Multi-scale and multi-orientation Gabor features
 - Hematoxylin and eosin stain-specific features
 

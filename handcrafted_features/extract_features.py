@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from rgb_histogram import extract_rgb_histogram
 from glcm import extract_glcm, get_glcm_feature_names
+from lbp import extract_lbp, get_lbp_feature_names
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -56,6 +57,18 @@ def get_feature_config(method, bins):
             "normed": True,
         }
 
+    if method == "lbp":
+        feature_names = get_lbp_feature_names()
+
+        return extract_lbp, feature_names, {
+            "method": "uniform",
+            "scales": [
+                {"neighbors": 8, "radius": 1},
+                {"neighbors": 16, "radius": 2},
+                {"neighbors": 24, "radius": 3},
+            ]
+        }
+    
     raise ValueError(f"Unsupported feature method: {method}")
 
 
@@ -286,7 +299,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--method",
-        choices=["rgb_histogram", "glcm"],
+        choices=["rgb_histogram", "glcm", "lbp"],
         default="rgb_histogram"
     )
 
