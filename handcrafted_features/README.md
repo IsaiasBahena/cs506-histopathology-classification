@@ -33,7 +33,44 @@ The current configuration uses:
 
 RGB histograms describe color distributions but do not capture spatial relationships between pixels.
 
-Additional texture and stain-based feature extractors will be added in subsequent development.
+### Gray-Level Co-occurrence Matrix (GLCM)
+
+GLCM features capture spatial relationships between neighboring grayscale pixel intensities. Unlike RGB histograms, which describe color distributions, GLCM measures texture characteristics such as contrast, uniformity, and intensity dependence.
+
+The current configuration uses:
+
+- **Input:** Original 224 × 224 images converted to grayscale
+- **Quantization:** 32 gray levels
+- **Distances:** 1, 2, and 4 pixels
+- **Angles:** 0°, 45°, 90°, and 135°
+- **Symmetric GLCM:** Enabled
+- **GLCM normalization:** Enabled
+- **Properties:** Contrast, dissimilarity, homogeneity, energy, correlation, and angular second moment (ASM)
+- **Aggregation:** Mean and standard deviation across the four angles
+
+For each image, 12 GLCMs are constructed using three distances and four angles.
+
+Each of the six texture properties is summarized using its mean and standard deviation across angles for each distance.
+
+The resulting feature vector contains:
+
+3 distances × 6 properties × 2 statistics = **36 features per image**
+
+Energy and ASM are mathematically related, but both are retained in the initial representation for comparison.
+
+### Combined Feature Representations
+
+The currently implemented feature extractors produce:
+
+| Feature Family | Features per Image |
+|---|---:|
+| RGB histograms | 48 |
+| GLCM texture | 36 |
+| **Total** | **84** |
+
+These features are currently stored in separate CSV files. They can be combined using image identifiers and dataset information to create an 84-dimensional feature representation.
+
+The combined feature matrix has not yet been generated or validated.
 
 ## Directory Structure
 
@@ -43,13 +80,15 @@ handcrafted_features/
 ├── requirements.txt
 ├── extract_features.py
 ├── rgb_histogram.py
+├── glcm.py
 ├── validate_features.py
 └── outputs/
 ```
 
 - `extract_features.py`: Reads metadata, processes images in batches, and saves feature matrices.
 - `rgb_histogram.py`: Calculates normalized RGB histograms for individual images.
-- `validate_features.py`: Validates the generated 16-bin RGB histogram CSV.
+- `glcm.py`: Computes GLCM texture statistics and generates feature names.
+- `validate_features.py`: Validates extracted handcrafted feature matrices, including RGB histograms and GLCM texture features.
 - `outputs/`: Stores generated feature matrices and extraction progress files. This directory is excluded from Git.
 
 ## Installation
@@ -61,6 +100,8 @@ pip install -r handcrafted_features/requirements.txt
 ```
 
 ## Extracting Features
+
+### RGB Histogram Feature Extraction
 
 Run the RGB histogram extractor from the repository root:
 
@@ -82,6 +123,28 @@ handcrafted_features/outputs/rgb_histogram_16.progress.json
 
 The progress file records the extraction configuration, completed image count, and elapsed time.
 
+### GLCM Feature Extraction
+
+To extract GLCM texture features from all images, run:
+
+```bash
+python handcrafted_features/extract_features.py --method glcm --batch-size 1000
+```
+
+The script saves the extracted features to:
+
+```text
+handcrafted_features/outputs/glcm.csv
+```
+
+Extraction progress is recorded in:
+
+```text
+handcrafted_features/outputs/glcm.progress.json
+```
+
+The output contains 107,180 rows and 40 columns: four metadata columns and 36 GLCM features.
+
 ### Checkpointing
 
 Features are saved after each batch. If extraction is interrupted, rerunning the same command attempts to resume from the last saved checkpoint.
@@ -89,6 +152,8 @@ Features are saved after each batch. If extraction is interrupted, rerunning the
 The script checks the existing output and progress metadata before resuming. An interruption during CSV writing may require manual recovery.
 
 ## Output Format
+
+### RGB Histogram Output
 
 The RGB histogram CSV contains 107,180 rows and 52 columns:
 
@@ -106,12 +171,44 @@ Each row represents one image.
 
 The extracted features can be joined with the project's training and validation metadata using image identifiers and dataset membership.
 
+### GLCM Output
+
+The GLCM CSV contains the same four metadata columns as the RGB histogram output:
+
+- `id`
+- `path`
+- `label`
+- `dataset`
+
+The remaining 36 columns contain GLCM texture statistics.
+
+Column names follow the pattern:
+
+```text
+glcm_d{distance}_{property}_{statistic}
+```
+
+Examples:
+
+```text
+glcm_d1_contrast_mean
+glcm_d1_contrast_std
+glcm_d2_homogeneity_mean
+glcm_d2_homogeneity_std
+glcm_d4_correlation_mean
+glcm_d4_correlation_std
+```
+
+Each image is represented by one row.
+
 ## Validation
+
+### RGB Histogram Validation
 
 To validate the saved RGB histogram features, run:
 
 ```bash
-python handcrafted_features/validate_features.py
+python handcrafted_features/validate_features.py --method rgb_histogram
 ```
 
 The validation checks include:
@@ -133,9 +230,64 @@ The validation checks include:
 | Output columns | 52 |
 | Extraction time | 25.89 minutes |
 | Average processing rate | 69 images/second |
+| Missing values | 0 |
+| Non-finite features | 0 |
+| Duplicate image paths | 0 |
 | Validation | All checks passed |
 
 These measurements were obtained using 16 bins per RGB channel and a batch size of 1,000 images.
+
+All extracted RGB histogram features satisfied the expected numerical constraints, including nonnegative values and normalization of each color channel.
+
+### GLCM Validation
+
+Run the GLCM validation script from the repository root:
+
+```bash
+python handcrafted_features/validate_features.py --method glcm
+```
+
+The validation checks include:
+
+- Expected dataset dimensions and class distributions
+- Missing values and non-finite feature values
+- Duplicate image paths
+- Valid numerical ranges for GLCM properties
+- Constant features across the dataset
+
+### Completed GLCM Extraction
+
+| Metric | Result |
+|---|---:|
+| Images processed | 107,180 |
+| Features per image | 36 |
+| Output columns | 40 |
+| Extraction time | 25.93 minutes |
+| Average processing rate | 68.89 images/second |
+| Missing values | 0 |
+| Non-finite features | 0 |
+| Duplicate image paths | 0 |
+| Constant features | 0 |
+| Validation | All checks passed |
+
+The observed GLCM feature ranges were:
+
+| Property | Minimum | Maximum |
+|---|---:|---:|
+| Contrast | 0.000856 | 100.785520 |
+| Dissimilarity | 0.000279 | 7.758544 |
+| Homogeneity | 0.000055 | 0.998579 |
+| Energy | 0.000007 | 0.994302 |
+| Correlation | -0.074638 | 0.998739 |
+| ASM | 0.000001 | 0.988637 |
+
+These ranges include both the mean and standard deviation features for each property.
+
+All extracted GLCM features satisfied their expected numerical constraints.
+
+The validation also confirmed that none of the 36 GLCM feature columns were constant across the dataset.
+
+These checks confirm the structural and numerical validity of the feature matrices, but classification experiments are still required to evaluate their predictive usefulness.
 
 ## Modeling Considerations
 
@@ -147,11 +299,12 @@ Any learned preprocessing transformations, including feature standardization, mu
 
 The project's current internal training/validation split is image-level rather than patient-level because patient identifiers are not available in the training metadata. This may produce optimistic internal validation estimates and should be considered when interpreting results.
 
+Different feature families may have substantially different numerical scales. Standardization should therefore be considered when combining feature representations, particularly for distance-based classifiers and clustering algorithms.
+
 ## Planned Features
 
 Future implementations may include:
 
-- Gray-Level Co-occurrence Matrix (GLCM) texture features
 - Local Binary Patterns (LBP)
 - Multi-scale and multi-orientation Gabor features
 - Hematoxylin and eosin stain-specific features

@@ -11,6 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from rgb_histogram import extract_rgb_histogram
+from glcm import extract_glcm, get_glcm_feature_names
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +41,20 @@ def get_feature_config(method, bins):
             return extract_rgb_histogram(image, bins=bins)
 
         return extractor, feature_names, {"bins": bins}
+
+    if method == "glcm":
+        feature_names = get_glcm_feature_names()
+
+        def extractor(image):
+            return extract_glcm(image)
+
+        return extractor, feature_names, {
+            "levels": 32,
+            "distances": [1, 2, 4],
+            "angles_degrees": [0, 45, 90, 135],
+            "symmetric": True,
+            "normed": True,
+        }
 
     raise ValueError(f"Unsupported feature method: {method}")
 
@@ -271,7 +286,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--method",
-        choices=["rgb_histogram"],
+        choices=["rgb_histogram", "glcm"],
         default="rgb_histogram"
     )
 
