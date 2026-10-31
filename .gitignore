@@ -224,3 +224,5 @@ __marimo__/
 
 # Generated preprocessing arrays
 /preprocessing/output/
+
+handcrafted_features/outputs/
