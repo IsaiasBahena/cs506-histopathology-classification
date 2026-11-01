@@ -177,7 +177,7 @@ The Gaussian envelope parameters use the defaults provided by `skimage.filters.g
 
 ### Combined Feature Representations
 
-The currently implemented feature extractors produce:
+The implemented feature extractors produce:
 
 | Feature Family | Features per Image |
 |---|---:|
@@ -187,11 +187,24 @@ The currently implemented feature extractors produce:
 | Gabor texture | 24 |
 | **Total** | **162** |
 
-These features are currently stored in separate CSV files.
+Each feature family is stored in a separate CSV file.
 
-They can be combined using image identifiers and dataset information to create a 162-dimensional feature representation.
+The four feature matrices have also been combined into a single dataset containing all 162 handcrafted features per image.
 
-The combined feature matrix has not yet been generated or validated.
+The combined dataset contains:
+
+- 107,180 images
+- 4 metadata columns
+- 162 feature columns
+- 166 columns in total
+
+The combination uses image paths to align feature vectors across the four source datasets.
+
+The individual feature files are retained so that each representation can be evaluated independently.
+
+The combined dataset supports experiments with individual feature families and selected combinations without requiring repeated feature extraction.
+
+The combined feature matrix has been generated and independently validated.
 
 ## Directory Structure
 
@@ -204,8 +217,19 @@ handcrafted_features/
 ├── glcm.py
 ├── lbp.py
 ├── gabor.py
+├── combine_features.py
 ├── validate_features.py
+├── validate_combined.py
 └── outputs/
+    ├── rgb_histogram_16.csv
+    ├── rgb_histogram_16.progress.json
+    ├── glcm.csv
+    ├── glcm.progress.json
+    ├── lbp.csv
+    ├── lbp.progress.json
+    ├── gabor.csv
+    ├── gabor.progress.json
+    └── combined_features.csv
 ```
 
 - `extract_features.py`: Reads metadata, processes images in batches, and saves feature matrices.
@@ -213,7 +237,9 @@ handcrafted_features/
 - `glcm.py`: Computes GLCM texture statistics and generates feature names.
 - `lbp.py`: Computes multi-scale uniform LBP histograms and generates feature names.
 - `gabor.py`: Computes multi-frequency, multi-orientation Gabor texture features using FFT-based convolution.
-- `validate_features.py`: Validates extracted handcrafted feature matrices, including RGB histograms, GLCM, LBP, and Gabor features.
+- `combine_features.py`: Combines the four extracted feature matrices into a single dataset, aligning images by path and verifying metadata consistency.
+- `validate_features.py`: Validates extracted RGB histogram, GLCM, LBP, and Gabor feature matrices.
+- `validate_combined.py`: Independently validates the combined feature matrix against the four original source files.
 - `outputs/`: Stores generated feature matrices and extraction progress files. This directory is excluded from Git.
 
 ## Installation
@@ -320,6 +346,67 @@ The output contains 107,180 rows and 28 columns: four metadata columns and 24 Ga
 
 Each image is represented by the mean and standard deviation of the magnitude responses from 12 Gabor filters.
 
+### Combining Feature Matrices
+
+After extracting all four feature families, run the combination script from the repository root:
+
+```bash
+python handcrafted_features/combine_features.py
+```
+
+The script reads the following files:
+
+```text
+handcrafted_features/outputs/rgb_histogram_16.csv
+handcrafted_features/outputs/glcm.csv
+handcrafted_features/outputs/lbp.csv
+handcrafted_features/outputs/gabor.csv
+```
+
+The combined dataset is saved to:
+
+```text
+handcrafted_features/outputs/combined_features.csv
+```
+
+The output contains 107,180 rows and 166 columns: four metadata columns and 162 handcrafted features.
+
+The script performs the following checks:
+
+- Expected number of images in each source file
+- Expected number of features for each feature family
+- Missing metadata and feature values
+- Non-finite feature values
+- Duplicate image paths
+- Consistent image identifiers across source files
+- Consistent tissue labels and dataset membership
+- Unique column names in the combined dataset
+- Expected final dataset dimensions
+
+Feature matrices are joined using image paths rather than row positions.
+
+This ensures that feature vectors from different extractors correspond to the same image even if the source CSV files have different row orders.
+
+The four original CSV files are retained.
+
+No feature scaling, normalization, or dimensionality reduction is performed during combination.
+
+These transformations should be handled by downstream modeling pipelines to prevent data leakage.
+
+**Completed combination:**
+
+| Metric | Result |
+|---|---:|
+| Images combined | 107,180 |
+| RGB histogram features | 48 |
+| GLCM features | 36 |
+| LBP features | 54 |
+| Gabor features | 24 |
+| Total features | 162 |
+| Metadata columns | 4 |
+| Total columns | 166 |
+| Combination | All checks passed |
+
 ### Checkpointing
 
 Features are saved after each batch. If extraction is interrupted, rerunning the same command attempts to resume from the last saved checkpoint.
@@ -327,6 +414,8 @@ Features are saved after each batch. If extraction is interrupted, rerunning the
 The script checks the existing output and progress metadata before resuming. An interruption during CSV writing may require manual recovery.
 
 If the feature extraction implementation or its configuration changes, existing output files should not be mixed with results from the new implementation.
+
+The combination script operates on completed feature CSV files and does not require the original image files.
 
 ## Output Format
 
@@ -468,6 +557,117 @@ The feature ordering follows the configured frequencies, orientations, and stati
 Unlike RGB and LBP histograms, Gabor features are not normalized to sum to 1.
 
 Each image is represented by one row.
+
+### Combined Feature Output
+
+The combined CSV contains 107,180 rows and 166 columns.
+
+The first four columns contain image metadata:
+
+- `id`
+- `path`
+- `label`
+- `dataset`
+
+The remaining 162 columns contain the concatenated handcrafted features.
+
+The feature columns are organized into four consecutive groups:
+
+| Feature Group | Number of Columns | Column Prefix |
+|---|---:|---|
+| RGB histograms | 48 | `r_hist_`, `g_hist_`, `b_hist_` |
+| GLCM | 36 | `glcm_` |
+| LBP | 54 | `lbp_` |
+| Gabor | 24 | `gabor_` |
+| **Total** | **162** | |
+
+The combined dataset preserves the original feature names.
+
+The feature columns are not standardized or normalized together.
+
+This allows downstream experiments to select individual feature families or combinations without modifying the original extracted values.
+
+#### Selecting Feature Families
+
+The combined dataset supports different feature configurations.
+
+For example, a classifier can be evaluated using:
+
+- RGB histograms only (48 features)
+- GLCM only (36 features)
+- LBP only (54 features)
+- Gabor only (24 features)
+- RGB + GLCM (84 features)
+- RGB + LBP (102 features)
+- GLCM + LBP + Gabor (114 features)
+- All four feature families (162 features)
+
+Feature groups can be selected using their column prefixes.
+
+For example:
+
+```python
+import pandas as pd
+
+df = pd.read_csv(
+    "handcrafted_features/outputs/combined_features.csv"
+)
+
+metadata_columns = ["id", "path", "label", "dataset"]
+
+rgb_columns = [
+    column
+    for column in df.columns
+    if column.startswith(("r_hist_", "g_hist_", "b_hist_"))
+]
+
+glcm_columns = [
+    column
+    for column in df.columns
+    if column.startswith("glcm_")
+]
+
+lbp_columns = [
+    column
+    for column in df.columns
+    if column.startswith("lbp_")
+]
+
+gabor_columns = [
+    column
+    for column in df.columns
+    if column.startswith("gabor_")
+]
+
+# Individual feature families
+X_rgb = df[rgb_columns]
+X_glcm = df[glcm_columns]
+X_lbp = df[lbp_columns]
+X_gabor = df[gabor_columns]
+
+# Selected combinations
+X_rgb_glcm = df[rgb_columns + glcm_columns]
+
+X_texture = df[
+    glcm_columns + lbp_columns + gabor_columns
+]
+
+# All handcrafted features
+feature_columns = [
+    column
+    for column in df.columns
+    if column not in metadata_columns
+]
+
+X_all = df[feature_columns]
+
+# Tissue labels
+y = df["label"]
+```
+
+These examples only select feature columns. They do not perform training, scaling, or evaluation.
+
+The dataset split and any learned preprocessing transformations should be handled separately by the modeling pipeline.
 
 ## Validation
 
@@ -681,6 +881,63 @@ The observed differences in feature ranges reflect variations in response magnit
 
 These numerical checks establish the structural and numerical consistency of the extracted Gabor features but do not establish their predictive usefulness.
 
+### Combined Feature Validation
+
+After generating the combined feature matrix, run:
+
+```bash
+python handcrafted_features/validate_combined.py
+```
+
+The script independently validates the combined dataset against the four original feature CSV files.
+
+The validation checks include:
+
+- Expected dataset dimensions
+- Expected total feature count
+- Unique column names
+- Missing values
+- Non-finite feature values
+- Duplicate image paths
+- Dataset and class distributions
+- Presence of all original feature columns
+- Matching image paths across source and combined datasets
+- Numerical agreement between combined and original feature values
+
+For each feature family, the validator joins the combined dataset with the original feature CSV using image paths.
+
+It then compares the corresponding feature values using:
+
+- Relative tolerance: `rtol=1e-6`
+- Absolute tolerance: `atol=1e-8`
+
+This verifies that the combination process preserved the extracted feature values.
+
+### Completed Combined Feature Validation
+
+| Metric | Result |
+|---|---:|
+| Images | 107,180 |
+| Total columns | 166 |
+| Metadata columns | 4 |
+| Feature columns | 162 |
+| NCT-CRC-HE-100K images | 100,000 |
+| CRC-VAL-HE-7K images | 7,180 |
+| Missing values | 0 |
+| Non-finite feature values | 0 |
+| Duplicate image paths | 0 |
+| RGB histogram features verified | 48 |
+| GLCM features verified | 36 |
+| LBP features verified | 54 |
+| Gabor features verified | 24 |
+| **Validation** | **All checks passed** |
+
+All 162 features were successfully verified against their original source files.
+
+The combined dataset preserves the original feature values and image associations.
+
+No feature misalignment or numerical inconsistencies were detected within the configured validation tolerances.
+
 ### Overall Extraction Summary
 
 | Feature Family | Features | Extraction Time | Validation |
@@ -694,6 +951,10 @@ These numerical checks establish the structural and numerical consistency of the
 The four feature families have been extracted and validated independently across all 107,180 images.
 
 The combined extraction time was approximately 6 hours and 23 minutes.
+
+The four feature matrices were subsequently merged into a single 162-dimensional representation.
+
+The combined dataset was independently validated against the original feature files, with all checks passing.
 
 These checks confirm the structural and numerical validity of the feature matrices, but classification experiments are still required to evaluate their predictive usefulness.
 
@@ -722,7 +983,74 @@ The current Gabor representation retains orientation-specific features, while th
 
 These representations should be evaluated individually and in combination to determine whether combining color and texture information improves classification or clustering performance.
 
+### Individual and Combined Feature Experiments
+
+The combined feature matrix supports experiments using individual feature families and different combinations.
+
+Evaluating feature families independently allows the project to compare their relative effectiveness.
+
+For example, RGB histograms can be evaluated separately from GLCM, LBP, and Gabor features to determine whether color or texture information is more informative for tissue classification.
+
+Combining feature families allows models to use multiple types of image information simultaneously.
+
+Potential experiments include:
+
+- Individual RGB, GLCM, LBP, and Gabor representations
+- Color and texture combinations
+- All grayscale texture features combined
+- All 162 handcrafted features combined
+
+More features do not necessarily improve model performance.
+
+Combining representations may introduce redundant or noisy features, so the combined representation should be evaluated empirically.
+
 Feature selection or dimensionality reduction may also be considered if the combined representation contains redundant or highly correlated features.
+
+### Supervised Classification
+
+The handcrafted feature matrices can be used as inputs to classical machine learning classifiers, including:
+
+- Logistic Regression
+- Decision Trees
+- Random Forests
+- Support Vector Machines
+
+The same training and evaluation splits should be used when comparing feature representations.
+
+Model selection, hyperparameter tuning, and learned preprocessing should use only the model-development data.
+
+CRC-VAL-HE-7K should remain reserved for independent final evaluation.
+
+### Unsupervised Clustering
+
+The feature matrices can also be used for unsupervised clustering experiments.
+
+Potential methods include:
+
+- K-Means
+- K-Means++
+- Hierarchical clustering
+- DBSCAN
+
+Clustering quality can be compared across feature families and selected combinations.
+
+Because clustering methods often depend on distances between feature vectors, feature scaling should be considered carefully.
+
+Dimensionality reduction and visualization methods such as PCA, t-SNE, and UMAP may help explore the structure of the extracted representations.
+
+### Sharing Generated Features
+
+All generated feature CSV files are stored in `handcrafted_features/outputs/`.
+
+This directory is excluded from Git because the generated feature matrices are large data artifacts rather than source code.
+
+The extraction, combination, and validation scripts are maintained in the repository, but the generated CSV files must be shared separately.
+
+For downstream modeling, teammates can use the combined CSV without repeating the original image feature extraction.
+
+The original individual feature CSVs can also be shared when experiments require separate feature representations.
+
+The combined dataset contains the same original features, so individual feature families can be selected directly using their column names.
 
 ## Planned Features
 
