@@ -109,6 +109,72 @@ Unlike GLCM, which summarizes statistical relationships between pairs of graysca
 
 LBP features are computed independently of tissue labels and do not explicitly identify biological structures.
 
+### Gabor Texture Features
+
+Gabor filters capture image texture by measuring responses to patterns at specific spatial frequencies and orientations.
+
+A Gabor filter combines a sinusoidal wave with a Gaussian envelope. The sinusoidal component detects spatial intensity variations at a particular frequency and orientation, while the Gaussian envelope localizes the filter response.
+
+Unlike GLCM and LBP, which characterize intensity relationships and local binary patterns, Gabor filters measure the strength and spatial variation of oriented texture responses.
+
+The current implementation uses a bank of Gabor filters with multiple frequencies and orientations.
+
+**Configuration:**
+
+- **Input:** Original 224 × 224 images converted to grayscale
+- **Intensity normalization:** Grayscale intensities converted to floating-point values and divided by 255
+- **Frequencies:** 0.05, 0.10, and 0.20 cycles/pixel
+- **Orientations:** 0°, 45°, 90°, and 135°
+- **Filter type:** Complex-valued Gabor kernels
+- **Convolution:** FFT-based convolution using `scipy.signal.fftconvolve`
+- **Boundary handling:** Zero-padding
+- **Output:** Magnitude of the complex filter response
+- **Aggregation:** Mean and standard deviation of the magnitude response
+
+The filter bank contains:
+
+3 frequencies × 4 orientations = **12 Gabor filters**
+
+For each filter, the implementation computes the real and imaginary response maps using FFT-based convolution.
+
+The response magnitude is calculated as:
+
+`magnitude = sqrt(real^2 + imaginary^2)`
+
+Two statistics are then extracted from the magnitude response:
+
+- **Mean:** Average magnitude across all image pixels
+- **Standard deviation:** Spatial variation in the magnitude response
+
+The resulting feature vector contains:
+
+3 frequencies × 4 orientations × 2 statistics = **24 features per image**
+
+#### FFT-Based Implementation
+
+The implementation uses `skimage.filters.gabor_kernel` to construct the Gabor kernels and `scipy.signal.fftconvolve` to perform convolution.
+
+All 12 Gabor kernels are generated once when the module is imported and reused for subsequent images.
+
+For each image:
+
+1. Convert the RGB image to grayscale.
+2. Convert grayscale intensities to floating-point values in the range [0, 1].
+3. Apply each Gabor kernel using FFT-based convolution.
+4. Compute the magnitude of the complex response.
+5. Calculate the mean and standard deviation of the magnitude.
+6. Concatenate the resulting statistics into a 24-dimensional feature vector.
+
+The FFT implementation was adopted because the initial spatial-convolution implementation was computationally expensive for the full dataset, particularly at lower frequencies.
+
+The original implementation had an estimated runtime of approximately 19 hours, while the completed FFT-based extraction required 209.56 minutes.
+
+The FFT implementation uses zero-padding at image boundaries, whereas the original `skimage.filters.gabor` implementation used reflective boundary handling by default.
+
+Therefore, the FFT-based features are not necessarily numerically identical to the original implementation. All saved Gabor features were extracted using the FFT-based implementation with consistent boundary handling.
+
+The Gaussian envelope parameters use the defaults provided by `skimage.filters.gabor_kernel`, including its default bandwidth.
+
 ### Combined Feature Representations
 
 The currently implemented feature extractors produce:
@@ -118,9 +184,12 @@ The currently implemented feature extractors produce:
 | RGB histograms | 48 |
 | GLCM texture | 36 |
 | LBP texture | 54 |
-| **Total** | **138** |
+| Gabor texture | 24 |
+| **Total** | **162** |
 
-These features are currently stored in separate CSV files. They can be combined using image identifiers and dataset information to create a 138-dimensional feature representation.
+These features are currently stored in separate CSV files.
+
+They can be combined using image identifiers and dataset information to create a 162-dimensional feature representation.
 
 The combined feature matrix has not yet been generated or validated.
 
@@ -134,6 +203,7 @@ handcrafted_features/
 ├── rgb_histogram.py
 ├── glcm.py
 ├── lbp.py
+├── gabor.py
 ├── validate_features.py
 └── outputs/
 ```
@@ -142,7 +212,8 @@ handcrafted_features/
 - `rgb_histogram.py`: Calculates normalized RGB histograms for individual images.
 - `glcm.py`: Computes GLCM texture statistics and generates feature names.
 - `lbp.py`: Computes multi-scale uniform LBP histograms and generates feature names.
-- `validate_features.py`: Validates extracted handcrafted feature matrices, including RGB histograms, GLCM, and LBP features.
+- `gabor.py`: Computes multi-frequency, multi-orientation Gabor texture features using FFT-based convolution.
+- `validate_features.py`: Validates extracted handcrafted feature matrices, including RGB histograms, GLCM, LBP, and Gabor features.
 - `outputs/`: Stores generated feature matrices and extraction progress files. This directory is excluded from Git.
 
 ## Installation
@@ -152,6 +223,8 @@ From the repository root, install the required dependencies:
 ```bash
 pip install -r handcrafted_features/requirements.txt
 ```
+
+The Gabor implementation requires SciPy for FFT-based convolution and scikit-image for Gabor kernel generation.
 
 ## Extracting Features
 
@@ -223,11 +296,37 @@ The output contains 107,180 rows and 58 columns: four metadata columns and 54 LB
 
 Each image is represented by three normalized LBP histograms corresponding to the configured neighborhood scales.
 
+### Gabor Feature Extraction
+
+To extract multi-frequency, multi-orientation Gabor features from all images, run:
+
+```bash
+python handcrafted_features/extract_features.py --method gabor --batch-size 1000
+```
+
+The script saves the extracted features to:
+
+```text
+handcrafted_features/outputs/gabor.csv
+```
+
+Extraction progress is recorded in:
+
+```text
+handcrafted_features/outputs/gabor.progress.json
+```
+
+The output contains 107,180 rows and 28 columns: four metadata columns and 24 Gabor features.
+
+Each image is represented by the mean and standard deviation of the magnitude responses from 12 Gabor filters.
+
 ### Checkpointing
 
 Features are saved after each batch. If extraction is interrupted, rerunning the same command attempts to resume from the last saved checkpoint.
 
 The script checks the existing output and progress metadata before resuming. An interruption during CSV writing may require manual recovery.
+
+If the feature extraction implementation or its configuration changes, existing output files should not be mixed with results from the new implementation.
 
 ## Output Format
 
@@ -324,6 +423,49 @@ The features are organized into three consecutive groups:
 | P=24, R=3 | 26 | 0–25 |
 
 Each group is independently normalized so that its histogram values sum to approximately 1.
+
+Each image is represented by one row.
+
+### Gabor Output
+
+The Gabor CSV contains 107,180 rows and 28 columns.
+
+The first four columns contain image metadata:
+
+- `id`
+- `path`
+- `label`
+- `dataset`
+
+The remaining 24 columns contain Gabor response magnitude statistics.
+
+Column names follow the pattern:
+
+```text
+gabor_f{frequency}_theta{orientation}_{statistic}
+```
+
+Examples:
+
+```text
+gabor_f0.05_theta0_mean
+gabor_f0.05_theta0_std
+gabor_f0.05_theta45_mean
+gabor_f0.05_theta45_std
+gabor_f0.10_theta90_mean
+gabor_f0.10_theta90_std
+gabor_f0.20_theta135_mean
+gabor_f0.20_theta135_std
+```
+
+For each frequency and orientation, two features are stored:
+
+- `mean`: Mean magnitude of the Gabor response
+- `std`: Standard deviation of the Gabor response magnitude
+
+The feature ordering follows the configured frequencies, orientations, and statistics.
+
+Unlike RGB and LBP histograms, Gabor features are not normalized to sum to 1.
 
 Each image is represented by one row.
 
@@ -464,6 +606,81 @@ The small deviations from exactly 1 are consistent with floating-point rounding.
 
 The validation confirmed that none of the 54 LBP feature columns were constant across the dataset.
 
+### Gabor Validation
+
+Run the Gabor validation script from the repository root:
+
+```bash
+python handcrafted_features/validate_features.py --method gabor
+```
+
+The validation checks include:
+
+- Expected dataset dimensions and class distributions
+- Missing values
+- Non-finite feature values
+- Duplicate image paths
+- Nonnegative Gabor feature values
+- Constant features across the dataset
+- Observed minimum and maximum values for each Gabor feature
+
+Unlike normalized histograms, Gabor response statistics are not expected to sum to 1.
+
+### Completed Gabor Extraction
+
+| Metric | Result |
+|---|---:|
+| Images processed | 107,180 |
+| Filters per image | 12 |
+| Features per image | 24 |
+| Output columns | 28 |
+| Extraction time | 209.56 minutes |
+| Average processing rate | 8.52 images/second |
+| Missing values | 0 |
+| Non-finite features | 0 |
+| Duplicate image paths | 0 |
+| Constant features | 0 |
+| Minimum feature value | 0.00025538384 |
+| Maximum feature value | 0.059361417 |
+| Validation | All checks passed |
+
+The observed Gabor feature ranges were:
+
+| Feature | Minimum | Maximum |
+|---|---:|---:|
+| `gabor_f0.05_theta0_mean` | 0.001437 | 0.059361 |
+| `gabor_f0.05_theta0_std` | 0.004802 | 0.039766 |
+| `gabor_f0.05_theta45_mean` | 0.000426 | 0.048069 |
+| `gabor_f0.05_theta45_std` | 0.000889 | 0.036345 |
+| `gabor_f0.05_theta90_mean` | 0.001987 | 0.054254 |
+| `gabor_f0.05_theta90_std` | 0.006225 | 0.036754 |
+| `gabor_f0.05_theta135_mean` | 0.000430 | 0.047362 |
+| `gabor_f0.05_theta135_std` | 0.000842 | 0.030258 |
+| `gabor_f0.10_theta0_mean` | 0.000941 | 0.045644 |
+| `gabor_f0.10_theta0_std` | 0.003744 | 0.034563 |
+| `gabor_f0.10_theta45_mean` | 0.000419 | 0.047321 |
+| `gabor_f0.10_theta45_std` | 0.000817 | 0.029861 |
+| `gabor_f0.10_theta90_mean` | 0.001230 | 0.047471 |
+| `gabor_f0.10_theta90_std` | 0.004865 | 0.039919 |
+| `gabor_f0.10_theta135_mean` | 0.000450 | 0.044195 |
+| `gabor_f0.10_theta135_std` | 0.000810 | 0.031351 |
+| `gabor_f0.20_theta0_mean` | 0.000556 | 0.042753 |
+| `gabor_f0.20_theta0_std` | 0.002647 | 0.029374 |
+| `gabor_f0.20_theta45_mean` | 0.000255 | 0.048922 |
+| `gabor_f0.20_theta45_std` | 0.000512 | 0.030936 |
+| `gabor_f0.20_theta90_mean` | 0.000787 | 0.045174 |
+| `gabor_f0.20_theta90_std` | 0.003849 | 0.032605 |
+| `gabor_f0.20_theta135_mean` | 0.000275 | 0.044432 |
+| `gabor_f0.20_theta135_std` | 0.000512 | 0.029829 |
+
+All extracted Gabor features were finite and nonnegative.
+
+The validation confirmed that none of the 24 Gabor feature columns were constant across the dataset.
+
+The observed differences in feature ranges reflect variations in response magnitude across frequencies, orientations, and images.
+
+These numerical checks establish the structural and numerical consistency of the extracted Gabor features but do not establish their predictive usefulness.
+
 ### Overall Extraction Summary
 
 | Feature Family | Features | Extraction Time | Validation |
@@ -471,9 +688,12 @@ The validation confirmed that none of the 54 LBP feature columns were constant a
 | RGB histograms | 48 | 25.89 minutes | Passed |
 | GLCM | 36 | 25.93 minutes | Passed |
 | LBP | 54 | 121.48 minutes | Passed |
-| **Total** | **138** | **173.30 minutes** | **All passed** |
+| Gabor | 24 | 209.56 minutes | Passed |
+| **Total** | **162** | **382.86 minutes** | **All passed** |
 
-The three feature families have been extracted and validated independently across all 107,180 images.
+The four feature families have been extracted and validated independently across all 107,180 images.
+
+The combined extraction time was approximately 6 hours and 23 minutes.
 
 These checks confirm the structural and numerical validity of the feature matrices, but classification experiments are still required to evaluate their predictive usefulness.
 
@@ -489,17 +709,25 @@ The project's current internal training/validation split is image-level rather t
 
 Different feature families may have substantially different numerical scales. Standardization should therefore be considered when combining feature representations, particularly for distance-based classifiers and clustering algorithms.
 
-RGB histograms describe color distributions, while GLCM and LBP provide complementary texture representations.
+The four feature families describe different aspects of histopathology image appearance:
 
-GLCM measures statistical relationships between pixel intensities at specified distances and directions, whereas LBP describes the distribution of local binary intensity patterns.
+- **RGB histograms:** Global color intensity distributions
+- **GLCM:** Statistical relationships between grayscale pixel intensities
+- **LBP:** Distributions of local binary texture patterns
+- **Gabor:** Oriented texture responses at multiple spatial frequencies
+
+GLCM, LBP, and Gabor are all grayscale texture descriptors, but they capture different aspects of image structure.
+
+The current Gabor representation retains orientation-specific features, while the GLCM implementation aggregates texture statistics across orientations.
 
 These representations should be evaluated individually and in combination to determine whether combining color and texture information improves classification or clustering performance.
+
+Feature selection or dimensionality reduction may also be considered if the combined representation contains redundant or highly correlated features.
 
 ## Planned Features
 
 Future implementations may include:
 
-- Multi-scale and multi-orientation Gabor features
 - Hematoxylin and eosin stain-specific features
 
 These representations will be evaluated individually and in combination using consistent data splits and downstream models.

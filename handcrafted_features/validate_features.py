@@ -8,6 +8,7 @@ import pandas as pd
 
 from glcm import get_glcm_feature_names
 from lbp import get_lbp_feature_names, LBP_SCALES
+from gabor import get_gabor_feature_names
 
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
@@ -38,6 +39,9 @@ def get_validation_config(method, bins):
 
     if method == "lbp":
         return OUTPUT_DIR / "lbp.csv", get_lbp_feature_names()
+
+    if method == "gabor":
+        return OUTPUT_DIR / "gabor.csv", get_gabor_feature_names()
 
     raise ValueError(f"Unsupported method: {method}")
 
@@ -206,6 +210,44 @@ def validate_features(method, bins=16):
             "Some LBP features are constant across all images."
         )
 
+    elif method == "gabor":
+        print("\nGabor feature validation:")
+
+        assert np.all(features >= 0), (
+            "Negative Gabor feature values found."
+        )
+
+        feature_min = features.min(axis=0)
+        feature_max = features.max(axis=0)
+        feature_std = features.std(axis=0)
+
+        constant_features = [
+            feature_names[i]
+            for i in np.where(feature_std < 1e-10)[0]
+        ]
+
+        print("Minimum feature value:", features.min())
+        print("Maximum feature value:", features.max())
+        print("Constant Gabor features:", len(constant_features))
+
+        if constant_features:
+            print("Constant columns:", constant_features)
+
+        assert not constant_features, (
+            "Some Gabor features are constant across all images."
+        )
+
+        print("\nGabor feature ranges:")
+
+        for name, minimum, maximum in zip(
+            feature_names, feature_min, feature_max
+        ):
+            print(
+                f"{name}: "
+                f"min={minimum:.6f}, "
+                f"max={maximum:.6f}"
+            )
+
     print("\nAll validation checks passed!")
 
 
@@ -215,7 +257,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--method",
-        choices=["rgb_histogram", "glcm", "lbp"],
+        choices=["rgb_histogram", "glcm", "lbp", "gabor"],
         required=True,
     )
     parser.add_argument("--bins", type=int, default=16)

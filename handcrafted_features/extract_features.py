@@ -13,6 +13,12 @@ from tqdm import tqdm
 from rgb_histogram import extract_rgb_histogram
 from glcm import extract_glcm, get_glcm_feature_names
 from lbp import extract_lbp, get_lbp_feature_names
+from gabor import (
+    extract_gabor,
+    get_gabor_feature_names,
+    GABOR_FREQUENCIES,
+    GABOR_ORIENTATIONS,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -67,6 +73,17 @@ def get_feature_config(method, bins):
                 {"neighbors": 16, "radius": 2},
                 {"neighbors": 24, "radius": 3},
             ]
+        }
+
+    if method == "gabor":
+        return extract_gabor, get_gabor_feature_names(), {
+            "frequencies": list(GABOR_FREQUENCIES),
+            "orientation_degrees": [
+                int(round(np.degrees(theta)))
+                for theta in GABOR_ORIENTATIONS
+            ],
+            "statistics": ["mean", "std"],
+            "response": "magnitude",
         }
     
     raise ValueError(f"Unsupported feature method: {method}")
@@ -299,7 +316,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--method",
-        choices=["rgb_histogram", "glcm", "lbp"],
+        choices=["rgb_histogram", "glcm", "lbp", "gabor"],
         default="rgb_histogram"
     )
 
