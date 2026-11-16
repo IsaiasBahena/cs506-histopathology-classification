@@ -1,7 +1,7 @@
 
 # Handcrafted Feature Extraction
 
-This directory contains scripts for extracting handcrafted image features from colorectal histopathology images.
+This directory contains scripts for extracting, combining, validating, and analyzing handcrafted image features from colorectal histopathology images.
 
 The goal is to represent histopathology images using classical computer vision features and evaluate their effectiveness for supervised classification and unsupervised clustering.
 
@@ -13,6 +13,7 @@ Feature extraction uses two datasets:
 |---|---:|---|
 | NCT-CRC-HE-100K | 100,000 | Model development |
 | CRC-VAL-HE-7K | 7,180 | Independent final evaluation |
+| **Total** | **107,180** | |
 
 All images are 224 × 224 RGB histopathology patches belonging to nine tissue classes: ADI, BACK, DEB, LYM, MUC, MUS, NORM, STR, and TUM.
 
@@ -26,10 +27,10 @@ RGB histograms capture the distribution of pixel intensities in each color chann
 
 The current configuration uses:
 
-- 16 bins per channel
-- 3 channels (red, green, blue)
-- 48 features per image
-- Independent normalization of each channel histogram so its values sum to 1
+- **Bins:** 16 per channel
+- **Channels:** Red, green, and blue
+- **Features:** 48 per image
+- **Normalization:** Each channel histogram independently normalized to sum to 1
 
 RGB histograms describe color distributions but do not capture spatial relationships between pixels.
 
@@ -75,7 +76,7 @@ The current implementation uses multi-scale, rotation-invariant uniform LBP.
 - **Neighborhoods:** Circular neighborhoods
 - **Scales:** Three combinations of neighboring points and radii
 - **Aggregation:** Normalized histograms of LBP codes
-- **Normalization:** Each scale's histogram is independently normalized to sum to 1
+- **Normalization:** Each scale's histogram independently normalized to sum to 1
 
 The three scales are:
 
@@ -220,6 +221,22 @@ handcrafted_features/
 ├── combine_features.py
 ├── validate_features.py
 ├── validate_combined.py
+├── visualize_features.py
+├── figures/
+│   ├── class_distributions/
+│   │   ├── rgb_class_distributions.png
+│   │   ├── glcm_class_distributions.png
+│   │   ├── lbp_class_distributions.png
+│   │   └── gabor_class_distributions.png
+│   ├── correlations/
+│   │   ├── rgb_correlation.png
+│   │   ├── glcm_correlation.png
+│   │   ├── lbp_correlation.png
+│   │   ├── gabor_correlation.png
+│   │   └── highly_correlated_features.csv
+│   └── feature_analysis/
+│       ├── feature_anova_scores.csv
+│       └── top_features_anova.png
 └── outputs/
     ├── rgb_histogram_16.csv
     ├── rgb_histogram_16.progress.json
@@ -232,6 +249,8 @@ handcrafted_features/
     └── combined_features.csv
 ```
 
+### Script Descriptions
+
 - `extract_features.py`: Reads metadata, processes images in batches, and saves feature matrices.
 - `rgb_histogram.py`: Calculates normalized RGB histograms for individual images.
 - `glcm.py`: Computes GLCM texture statistics and generates feature names.
@@ -240,6 +259,8 @@ handcrafted_features/
 - `combine_features.py`: Combines the four extracted feature matrices into a single dataset, aligning images by path and verifying metadata consistency.
 - `validate_features.py`: Validates extracted RGB histogram, GLCM, LBP, and Gabor feature matrices.
 - `validate_combined.py`: Independently validates the combined feature matrix against the four original source files.
+- `visualize_features.py`: Generates class-wise feature distributions, correlation heatmaps, correlation summaries, and ANOVA feature rankings.
+- `figures/`: Stores generated exploratory analysis figures and summary CSV files.
 - `outputs/`: Stores generated feature matrices and extraction progress files. This directory is excluded from Git.
 
 ## Installation
@@ -249,6 +270,8 @@ From the repository root, install the required dependencies:
 ```bash
 pip install -r handcrafted_features/requirements.txt
 ```
+
+The implementation uses NumPy, pandas, Pillow, scikit-image, SciPy, Matplotlib, Seaborn, and scikit-learn.
 
 The Gabor implementation requires SciPy for FFT-based convolution and scikit-image for Gabor kernel generation.
 
@@ -354,7 +377,7 @@ After extracting all four feature families, run the combination script from the 
 python handcrafted_features/combine_features.py
 ```
 
-The script reads the following files:
+The script reads:
 
 ```text
 handcrafted_features/outputs/rgb_histogram_16.csv
@@ -434,8 +457,6 @@ The RGB histogram CSV contains 107,180 rows and 52 columns:
 | `b_hist_000` through `b_hist_015` | Blue-channel histogram |
 
 Each row represents one image.
-
-The extracted features can be joined with the project's training and validation metadata using image identifiers and dataset membership.
 
 ### GLCM Output
 
@@ -689,7 +710,7 @@ The validation checks include:
 - Nonnegative histogram values
 - Per-channel histogram normalization
 
-### Completed RGB Histogram Extraction
+**Completed RGB Histogram Extraction:**
 
 | Metric | Result |
 |---|---:|
@@ -723,7 +744,7 @@ The validation checks include:
 - Valid numerical ranges for GLCM properties
 - Constant features across the dataset
 
-### Completed GLCM Extraction
+**Completed GLCM Extraction:**
 
 | Metric | Result |
 |---|---:|
@@ -777,7 +798,7 @@ For each image, the validator checks that the 10-bin, 18-bin, and 26-bin histogr
 
 A numerical tolerance is used to account for floating-point rounding errors.
 
-### Completed LBP Extraction
+**Completed LBP Extraction:**
 
 | Metric | Result |
 |---|---:|
@@ -826,7 +847,7 @@ The validation checks include:
 
 Unlike normalized histograms, Gabor response statistics are not expected to sum to 1.
 
-### Completed Gabor Extraction
+**Completed Gabor Extraction:**
 
 | Metric | Result |
 |---|---:|
@@ -913,7 +934,7 @@ It then compares the corresponding feature values using:
 
 This verifies that the combination process preserved the extracted feature values.
 
-### Completed Combined Feature Validation
+**Completed Combined Feature Validation:**
 
 | Metric | Result |
 |---|---:|
@@ -957,6 +978,411 @@ The four feature matrices were subsequently merged into a single 162-dimensional
 The combined dataset was independently validated against the original feature files, with all checks passing.
 
 These checks confirm the structural and numerical validity of the feature matrices, but classification experiments are still required to evaluate their predictive usefulness.
+
+## Exploratory Feature Analysis
+
+Exploratory analysis was performed to investigate class-wise feature distributions, correlations between features, and the ability of individual features to distinguish tissue classes.
+
+All exploratory analyses used the **100,000 images from NCT-CRC-HE-100K**.
+
+The independent CRC-VAL-HE-7K dataset was excluded from exploratory analysis to preserve it for final evaluation.
+
+### Visualization Pipeline
+
+The `visualize_features.py` script generates:
+
+- Class-wise boxplots for representative RGB, GLCM, LBP, and Gabor features
+- Pearson correlation heatmaps for each feature family
+- A CSV containing highly correlated feature pairs
+- One-way ANOVA F-statistics for all 162 features
+- A bar chart of the 20 highest-ranked features by ANOVA F-statistic
+
+Run from the repository root:
+
+```bash
+python handcrafted_features/visualize_features.py
+```
+
+The correlation threshold can also be configured:
+
+```bash
+python handcrafted_features/visualize_features.py --correlation-threshold 0.95
+```
+
+The default correlation threshold is 0.95.
+
+Generated figures and analysis results are saved under:
+
+```text
+handcrafted_features/figures/
+```
+
+### Class-Wise Feature Distributions
+
+Representative features from each family were visualized using boxplots across the nine tissue classes.
+
+The boxplots show the median, interquartile range, and whiskers for each feature within each class.
+
+Outliers are hidden in the plots to improve readability.
+
+Three representative features were selected from each family.
+
+#### RGB Histograms
+
+The selected RGB histogram features show differences in color distributions across tissue classes.
+
+Notable observations include:
+
+- BACK generally exhibits low values in the selected histogram bins.
+- STR shows relatively high values in selected green and blue intensity bins.
+- MUC exhibits a relatively high median in the selected blue histogram bin.
+- Considerable overlap exists between several tissue classes.
+
+These findings suggest that global color distributions contain class-dependent information.
+
+However, an individual histogram-bin value represents the proportion of pixels within an intensity interval, not the average intensity of the entire color channel.
+
+Generated figure:
+
+```text
+figures/class_distributions/rgb_class_distributions.png
+```
+
+#### GLCM
+
+The selected GLCM features show differences in local grayscale texture characteristics.
+
+Notable observations include:
+
+- BACK exhibits relatively low GLCM contrast.
+- BACK exhibits substantially higher homogeneity than most tissue classes.
+- LYM and TUM exhibit relatively high contrast values.
+- NORM exhibits relatively high correlation values in the selected feature.
+- Several tissue classes have overlapping distributions.
+
+The high homogeneity of BACK is consistent with its comparatively uniform grayscale appearance.
+
+The observed differences indicate that GLCM captures meaningful variation in local texture across tissue categories.
+
+Generated figure:
+
+```text
+figures/class_distributions/glcm_class_distributions.png
+```
+
+#### Local Binary Patterns
+
+Selected LBP histogram bins show differences in local texture pattern frequencies.
+
+Notable observations include:
+
+- BACK generally exhibits low values in the selected LBP bins.
+- LYM exhibits relatively distinct distributions in selected bins.
+- Some LBP bins show relatively narrow distributions for LYM.
+- Considerable overlap exists among several other tissue classes.
+
+These observations suggest that local binary texture patterns differ across tissue categories.
+
+However, individual LBP histogram bins do not completely separate all nine classes.
+
+Generated figure:
+
+```text
+figures/class_distributions/lbp_class_distributions.png
+```
+
+#### Gabor Features
+
+Selected Gabor features show differences in oriented texture response magnitudes.
+
+Notable observations include:
+
+- LYM exhibits relatively high Gabor response magnitudes.
+- BACK exhibits consistently low responses in the selected features.
+- NORM exhibits relatively high responses for some lower-frequency filters.
+- Several other tissue classes exhibit overlapping distributions.
+
+These observations suggest that oriented spatial texture responses capture class-dependent differences in tissue appearance.
+
+Generated figure:
+
+```text
+figures/class_distributions/gabor_class_distributions.png
+```
+
+#### Summary of Class-Wise Distributions
+
+The four feature families capture different aspects of histopathology image appearance.
+
+The class-wise distributions reveal meaningful differences between certain tissue categories, particularly BACK and LYM.
+
+However, considerable overlap remains between multiple classes.
+
+No single selected feature provides complete separation across all nine tissue classes.
+
+These findings motivate evaluating multiple handcrafted features together rather than relying on individual descriptors.
+
+The representative features were selected for exploratory visualization and were not chosen using supervised feature selection.
+
+### Feature Correlation Analysis
+
+Pearson correlation coefficients were calculated between the 162 handcrafted features using the NCT-CRC-HE-100K development dataset.
+
+Separate correlation heatmaps were generated for each feature family.
+
+The analysis also identified pairs of features with absolute Pearson correlation greater than or equal to 0.95.
+
+#### Highly Correlated Feature Pairs
+
+| Feature Family | Number of Features | Highly Correlated Pairs |
+|---|---:|---:|
+| RGB | 48 | 2 |
+| GLCM | 36 | 26 |
+| LBP | 54 | 31 |
+| Gabor | 24 | 0 |
+| **Total** | **162** | **59** |
+
+All 59 highly correlated pairs belonged to the same feature family.
+
+No cross-family feature pairs exceeded the selected absolute correlation threshold.
+
+This result suggests that substantial redundancy exists within some feature families.
+
+However, the absence of cross-family correlations above 0.95 does not establish that the feature families contain independent predictive information.
+
+#### RGB Correlations
+
+The RGB correlation heatmap exhibits structured relationships between neighboring intensity bins and across color channels.
+
+Correlations within each channel are partly influenced by the fact that histogram bins are normalized to sum to 1.
+
+Some neighboring bins exhibit positive correlations, while other bins exhibit negative relationships.
+
+These patterns reflect relationships among the color distributions of the images.
+
+#### GLCM Correlations
+
+The GLCM correlation heatmap exhibits strong positive and negative correlations between several texture statistics.
+
+Features calculated at different pixel distances are particularly strongly correlated.
+
+For example:
+
+| Feature 1 | Feature 2 | Absolute Correlation |
+|---|---|---:|
+| `glcm_d1_energy_mean` | `glcm_d2_energy_mean` | 0.999767 |
+| `glcm_d1_asm_mean` | `glcm_d2_asm_mean` | 0.999622 |
+| `glcm_d2_energy_mean` | `glcm_d4_energy_mean` | 0.998752 |
+| `glcm_d1_dissimilarity_mean` | `glcm_d2_dissimilarity_mean` | 0.998457 |
+| `glcm_d1_homogeneity_mean` | `glcm_d2_homogeneity_mean` | 0.997752 |
+
+These results indicate that some GLCM statistics measured at different distances contain highly redundant information.
+
+However, different GLCM properties can still describe distinct aspects of texture.
+
+#### LBP Correlations
+
+The LBP correlation heatmap exhibits block structures corresponding to the three neighborhood configurations.
+
+Some histogram bins are strongly correlated across different scales.
+
+For example, `lbp_p16_r2_hist_017` and `lbp_p24_r3_hist_025` have an absolute correlation of approximately 0.993.
+
+These relationships suggest that certain local binary patterns are related across neighborhood sizes.
+
+Other bins exhibit weaker or negative correlations, indicating variation in the captured texture information.
+
+#### Gabor Correlations
+
+The Gabor correlation heatmap exhibits predominantly positive correlations between filter-response features.
+
+Correlation strengths vary across frequencies, orientations, and response statistics.
+
+No Gabor feature pairs exceeded the absolute correlation threshold of 0.95.
+
+However, this does not imply that the Gabor features are uncorrelated.
+
+Several features still exhibit moderate or strong positive correlations below the selected threshold.
+
+#### Interpretation of Feature Redundancy
+
+The correlation analysis identified substantial redundancy within GLCM and LBP representations.
+
+Highly correlated features were retained in the combined feature matrix.
+
+Removing correlated features may reduce dimensionality, but it does not necessarily improve classification or clustering performance.
+
+Downstream experiments can compare the full representation against a correlation-filtered representation to determine whether feature reduction is beneficial.
+
+Any correlation-based feature filtering used in predictive modeling should be fitted using training data only.
+
+#### Generated Correlation Outputs
+
+```text
+figures/correlations/
+├── rgb_correlation.png
+├── glcm_correlation.png
+├── lbp_correlation.png
+├── gabor_correlation.png
+└── highly_correlated_features.csv
+```
+
+The CSV contains:
+
+- `feature_1`
+- `feature_2`
+- `absolute_correlation`
+
+The file is sorted by descending absolute correlation.
+
+### Feature Discriminativeness Analysis
+
+One-way ANOVA was used to evaluate differences in individual feature values across the nine tissue classes.
+
+The analysis was performed on all 162 handcrafted features using the NCT-CRC-HE-100K development dataset.
+
+For each feature, the ANOVA F-statistic compares between-class variation against within-class variation:
+
+```text
+F = Between-class mean square / Within-class mean square
+```
+
+Higher F-statistics indicate stronger differences between class means relative to within-class variability.
+
+ANOVA evaluates each feature independently and does not measure the incremental predictive contribution of a feature when combined with others.
+
+#### Highest-Ranked Feature per Family
+
+| Feature Family | Highest-Ranked Feature | F-statistic |
+|---|---|---:|
+| RGB | `g_hist_012` | 11,280.81 |
+| GLCM | `glcm_d4_homogeneity_mean` | 53,565.36 |
+| LBP | `lbp_p8_r1_hist_002` | 58,266.41 |
+| Gabor | `gabor_f0.10_theta45_mean` | 24,926.87 |
+
+The highest-ranked individual feature was `lbp_p8_r1_hist_002`, with an F-statistic of approximately 58,266.
+
+The highest-ranked GLCM feature was `glcm_d4_homogeneity_mean`, with an F-statistic of approximately 53,565.
+
+#### Top 20 Features
+
+| Rank | Feature | F-statistic | Family |
+|---:|---|---:|---|
+| 1 | `lbp_p8_r1_hist_002` | 58,266.41 | LBP |
+| 2 | `glcm_d4_homogeneity_mean` | 53,565.36 | GLCM |
+| 3 | `glcm_d1_energy_mean` | 42,774.78 | GLCM |
+| 4 | `glcm_d2_homogeneity_mean` | 41,184.17 | GLCM |
+| 5 | `glcm_d2_energy_mean` | 40,600.59 | GLCM |
+| 6 | `glcm_d4_energy_mean` | 35,946.65 | GLCM |
+| 7 | `lbp_p8_r1_hist_004` | 35,404.50 | LBP |
+| 8 | `lbp_p8_r1_hist_008` | 35,114.57 | LBP |
+| 9 | `glcm_d1_homogeneity_mean` | 34,848.36 | GLCM |
+| 10 | `glcm_d1_asm_std` | 31,613.80 | GLCM |
+| 11 | `glcm_d4_asm_std` | 26,835.54 | GLCM |
+| 12 | `gabor_f0.10_theta45_mean` | 24,926.87 | Gabor |
+| 13 | `gabor_f0.10_theta0_mean` | 23,386.66 | Gabor |
+| 14 | `gabor_f0.10_theta135_mean` | 22,904.78 | Gabor |
+| 15 | `glcm_d4_dissimilarity_mean` | 22,897.54 | GLCM |
+| 16 | `lbp_p16_r2_hist_011` | 22,134.18 | LBP |
+| 17 | `glcm_d1_asm_mean` | 21,937.66 | GLCM |
+| 18 | `lbp_p8_r1_hist_003` | 21,030.90 | LBP |
+| 19 | `glcm_d2_asm_mean` | 20,174.71 | GLCM |
+| 20 | `lbp_p24_r3_hist_014` | 19,962.72 | LBP |
+
+#### Distribution of Top-Ranked Features
+
+Among the 20 highest-ranked features:
+
+| Feature Family | Features in Top 20 |
+|---|---:|
+| GLCM | 11 |
+| LBP | 6 |
+| Gabor | 3 |
+| RGB | 0 |
+| **Total** | **20** |
+
+GLCM and LBP dominate the highest-ranked individual features.
+
+These findings suggest that several grayscale texture descriptors exhibit strong class-dependent mean differences in the dataset.
+
+However, the rankings do not establish that GLCM or LBP will necessarily produce the highest classification accuracy.
+
+Highly ranked features may also be strongly correlated with one another.
+
+RGB features may still provide complementary predictive information when combined with texture descriptors.
+
+#### Statistical Significance
+
+The ANOVA analysis also reports p-values.
+
+Many features have reported p-values of `0.0` because extremely small values underflow to zero in floating-point calculations.
+
+These values should not be interpreted as mathematically zero probabilities.
+
+With 100,000 images, even relatively small differences can produce highly significant p-values.
+
+The F-statistics are therefore used primarily to compare the relative strength of class-dependent mean differences rather than to establish predictive performance.
+
+#### Generated ANOVA Outputs
+
+```text
+figures/feature_analysis/
+├── feature_anova_scores.csv
+└── top_features_anova.png
+```
+
+The CSV contains:
+
+- `feature`
+- `f_score`
+- `p_value`
+- `family`
+
+All 162 features are ranked by descending F-statistic.
+
+The PNG visualizes the 20 highest-ranked features, colored by feature family.
+
+### Exploratory Analysis Summary
+
+The exploratory analysis produced three main findings.
+
+**1. Handcrafted features capture class-dependent differences.**
+
+Class-wise distributions reveal meaningful differences in color and texture characteristics, particularly for BACK and LYM.
+
+However, individual features exhibit substantial overlap across several tissue classes.
+
+**2. Some feature families contain substantial redundancy.**
+
+The correlation analysis identified 59 feature pairs with absolute Pearson correlation of at least 0.95.
+
+Most highly correlated pairs belonged to GLCM and LBP.
+
+These results motivate evaluating whether feature reduction improves downstream performance.
+
+**3. Texture features dominate the highest individual ANOVA rankings.**
+
+GLCM and LBP account for 17 of the 20 highest-ranked features.
+
+This suggests that grayscale texture descriptors exhibit strong differences in feature means across tissue classes.
+
+However, these exploratory findings do not establish which feature representation produces the best classification or clustering results.
+
+That requires downstream experiments using consistent training and evaluation procedures.
+
+### Methodological Considerations
+
+The exploratory analysis was performed on the complete NCT-CRC-HE-100K development dataset.
+
+These results are intended for descriptive analysis and project documentation.
+
+For downstream supervised classification, feature selection based on ANOVA scores must be fitted using training data only.
+
+When cross-validation is used, feature selection must be performed independently within each training fold.
+
+The same principle applies to feature scaling and data-driven correlation filtering.
+
+The CRC-VAL-HE-7K dataset remains reserved for independent final evaluation.
 
 ## Modeling Considerations
 
@@ -1044,7 +1470,7 @@ All generated feature CSV files are stored in `handcrafted_features/outputs/`.
 
 This directory is excluded from Git because the generated feature matrices are large data artifacts rather than source code.
 
-The extraction, combination, and validation scripts are maintained in the repository, but the generated CSV files must be shared separately.
+The extraction, combination, validation, and visualization scripts are maintained in the repository, but the generated feature matrices must be shared separately.
 
 For downstream modeling, teammates can use the combined CSV without repeating the original image feature extraction.
 
@@ -1058,4 +1484,4 @@ Future implementations may include:
 
 - Hematoxylin and eosin stain-specific features
 
-These representations will be evaluated individually and in combination using consistent data splits and downstream models.
+These representations may be evaluated individually and in combination using consistent data splits and downstream models.
