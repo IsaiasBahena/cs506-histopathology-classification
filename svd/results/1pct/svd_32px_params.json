@@ -1,0 +1,33 @@
+{
+  "sample": "1pct",
+  "image_size": 32,
+  "pixel_order": "row, column, channel (RGB); values scaled to [0, 1] before centering",
+  "downsampling": "PIL box averaging",
+  "n_pixel_features": 3072,
+  "n_components": 256,
+  "feature_columns": "svd_000 .. svd_255",
+  "method": "mean-centered randomized SVD (sklearn PCA, svd_solver='randomized', no whitening)",
+  "fit_split": "train",
+  "random_state": 506,
+  "images_per_split": {
+    "train": 796,
+    "val": 200,
+    "test": 68
+  },
+  "total_explained_variance_ratio": 0.9308660626411438,
+  "components_for_variance": {
+    "0.80": 88,
+    "0.90": 195,
+    "0.95": null,
+    "0.99": null
+  },
+  "fit_seconds": 1.591,
+  "transform_seconds_all_splits": 0.05,
+  "versions": {
+    "python": "3.12.9",
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "scikit-learn": "1.9.1",
+    "Pillow": "13.0.0"
+  }
+}
