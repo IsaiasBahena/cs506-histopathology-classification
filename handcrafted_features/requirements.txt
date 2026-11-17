@@ -3,3 +3,7 @@ pandas
 Pillow
 tqdm
 scikit-image
+scipy
+matplotlib
+seaborn
+scikit-learn
