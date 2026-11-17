@@ -226,3 +226,6 @@ __marimo__/
 /preprocessing/output/
 
 handcrafted_features/outputs/
+
+# SVD pixel caches, feature matrices, and fitted models
+/svd/outputs/
