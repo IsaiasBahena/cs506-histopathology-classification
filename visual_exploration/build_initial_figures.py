@@ -4,12 +4,16 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+VISUAL_DIR = PROJECT_ROOT / "visual_exploration"
+OUTPUT_DIR = VISUAL_DIR / "figures"
+DATA_DIR = PROJECT_ROOT / "data"
+SAMPLE_DIR = DATA_DIR / "sample_1pct"
+
 tissueClasses = ["ADI", "BACK", "DEB", "LYM", "MUC", "MUS", "NORM", "STR", "TUM"]
 state = 1 #in order to make reproducable and same subset, having a set state
-data_dir = Path("../data")
-metadata = pd.read_csv("../data/sample_1pct/image_metadata_1pct.csv") #getting data from the 1% metadata csv
-output_dir = Path("figures")
-output_dir.mkdir(parents=True, exist_ok=True)
+metadata = pd.read_csv(SAMPLE_DIR / "image_metadata_1pct.csv") #getting data from the 1% metadata csv
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 metadata = metadata[metadata["label"].isin(tissueClasses)].copy()
 manifest = metadata.sort_values("id")
 
@@ -40,12 +44,12 @@ def build_montage():
             ax = axes[row, col + 1]
             ax.axis("off")
             if col < len(examples):
-                image_path = data_dir / examples.iloc[col]["path"]
+                image_path = DATA_DIR / examples.iloc[col]["path"]
                 with Image.open(image_path) as image:
                     ax.imshow(image.convert("RGB"))
     fig.suptitle("Visual Sampling of Each Tissue Class", y=0.99)
     fig.tight_layout(rect=[0, 0, 1, 0.98])
-    fig.savefig(output_dir / "tissue_montage.png", dpi=160, bbox_inches="tight")
+    fig.savefig(OUTPUT_DIR / "tissue_montage.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
 
 #average mean brightness
@@ -53,7 +57,7 @@ def build_mean_brightness_figure():
     feature_rows = sample_tissue_class(n=50)
     brightness_by_class = {label: [] for label in tissueClasses}
     for _, row in feature_rows.iterrows():
-        image_path = data_dir / row["path"]
+        image_path = DATA_DIR / row["path"]
         with Image.open(image_path) as image:
             pixels = np.asarray(image.convert("RGB"), dtype=np.float32)
         brightness_by_class[row["label"]].append(float(pixels.mean()))
@@ -65,7 +69,7 @@ def build_mean_brightness_figure():
     ax.set_ylabel("Mean pixel intensity (0–255)") #0 would be black (dark), and #255 full brightness white
     fig.tight_layout()
     fig.savefig(
-        output_dir / "mean_brightness_by_tissue_class.png",
+        OUTPUT_DIR / "mean_brightness_by_tissue_class.png",
         dpi=160,
         bbox_inches="tight"
     )
@@ -83,7 +87,7 @@ def build_color_intensity_distribution_figure():
         class_images = feature_rows[feature_rows["label"] == label]
         histograms = [[], [], []] #one distribution per color value (red, green, blue)
         for _, row in class_images.iterrows():
-            image_path = data_dir / row["path"]
+            image_path = DATA_DIR / row["path"]
             with Image.open(image_path) as image:
                 pixels = np.asarray(image.convert("RGB"))
             for colorChannel in range(3):
@@ -111,7 +115,7 @@ def build_color_intensity_distribution_figure():
     fig.suptitle("Average RGB intensity distributions by tissue class")
     fig.tight_layout()
     fig.savefig(
-        "figures/rgb_distributions_by_class.png",
+        OUTPUT_DIR / "rgb_distributions_by_class.png",
         dpi=160,
         bbox_inches="tight"
     )

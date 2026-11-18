@@ -209,10 +209,9 @@ def extract_features(method, bins=16, batch_size=1000):
                 batch_metadata.itertuples(index=False)
             ):
                 # Metadata uses Windows-style relative paths.
-                relative_path = Path(
-                    *str(row.path).replace("\\", "/").split("/")
+                image_path = Path(
+                    str(row.path).replace("\\", "/")
                 )
-                image_path = DATA_ROOT / relative_path
 
                 try:
                     with Image.open(image_path) as image:

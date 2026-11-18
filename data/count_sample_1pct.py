@@ -1,10 +1,14 @@
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+SAMPLE_DIR = DATA_DIR / "sample_1pct"
+
 def count_1pct():
-    with open("sample_1pct/count_1pct.txt", "w") as f:
+    with open(SAMPLE_DIR / "count_1pct.txt", "w") as f:
         for name in ("NCT-CRC-HE-100K", "CRC-VAL-HE-7K"):
             total_count = 0
-            p = Path("./sample_1pct/" + name)
+            p = Path(SAMPLE_DIR / name)
             f.write(name + " image count (1pct sample)\n")
             for child in sorted(p.iterdir()):
                 count = 0

@@ -16,7 +16,8 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 DATA_DIR = PROJECT_ROOT / "data"
-METADATA_PATH = DATA_DIR / "full" / "image_metadata.csv"
+FULL_DIR = DATA_DIR / "full"
+METADATA_PATH = FULL_DIR / "image_metadata.csv"
 
 REPORTS_DIR = PROJECT_ROOT / "image_validation" / "reports"
 SUMMARY_PATH = REPORTS_DIR / "image_quality_summary.json"
@@ -195,7 +196,7 @@ def validate_metadata_row(row, issues):
 
     # Validate expected directory structure.
     expected_path = (
-        Path("full") / row.dataset / row.label / row.id
+        FULL_DIR / row.dataset / row.label / row.id
     )
 
     if path != expected_path:

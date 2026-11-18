@@ -7,17 +7,21 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PREPROC_DIR = PROJECT_ROOT / "preprocessing"
+OUTPUT_DIR = PREPROC_DIR / "output"
+FIGURES_DIR = PREPROC_DIR / "figures"
+DATA_DIR = PROJECT_ROOT / "data"
+SAMPLE_DIR = DATA_DIR / "sample_1pct"
+
 tissue_classes = ["ADI", "BACK", "DEB", "LYM", "MUC", "MUS", "NORM", "STR", "TUM"]
 state = 1 #fixed seed so the same example images are chosen every run
 original_size = 224
 sizes = [64, 32] #downsampled resolutions to compare against the original
 full_nct_count = 100000 #size of NCT-CRC-HE-100K, used to project memory needs
-data_dir = Path("../data")
-output_dir = Path("output")
-figures_dir = Path("figures")
-output_dir.mkdir(parents=True, exist_ok=True)
-figures_dir.mkdir(parents=True, exist_ok=True)
-metadata = pd.read_csv(data_dir / "sample_1pct" / "image_metadata_1pct.csv")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+metadata = pd.read_csv(SAMPLE_DIR / "image_metadata_1pct.csv")
 metadata = metadata[((metadata["dataset"] == "NCT-CRC-HE-100K") & metadata["label"].isin(tissue_classes))]
 manifest = metadata.sort_values("id").reset_index(drop=True)
 
@@ -29,7 +33,7 @@ def downsample(image, size):
 def build_pixel_matrices():
     vectors = {size: [] for size in sizes}
     for _, row in manifest.iterrows():
-        with Image.open(data_dir / row["path"]) as image:
+        with Image.open(DATA_DIR / row["path"]) as image:
             rgb = image.convert("RGB")
         for size in sizes:
             vector = np.asarray(downsample(rgb, size), dtype=np.uint8).reshape(-1)
@@ -38,7 +42,7 @@ def build_pixel_matrices():
     for size in sizes:
         x = np.stack(vectors[size])
         np.savez_compressed(
-            output_dir / f"pixels_{size}.npz",
+            OUTPUT_DIR / f"pixels_{size}.npz",
             X=x,
             image_id=manifest["id"].to_numpy(dtype=str),
             label=manifest["label"].to_numpy(dtype=str)
@@ -57,7 +61,7 @@ def build_comparison_figure():
         squeeze=False
     )
     for row, (_, example) in enumerate(examples.iterrows()):
-        with Image.open(data_dir / example["path"]) as image:
+        with Image.open(DATA_DIR / example["path"]) as image:
             rgb = image.convert("RGB")
         for col, size in enumerate(columns):
             ax = axes[row, col]
@@ -71,7 +75,7 @@ def build_comparison_figure():
                 ax.set_ylabel(example["label"], fontsize=14, weight="bold")
     fig.suptitle("Original vs downsampled images by tissue class", y=0.995)
     fig.tight_layout(rect=[0, 0, 1, 0.99])
-    fig.savefig(figures_dir / "downsampling_comparison.png", dpi=160, bbox_inches="tight")
+    fig.savefig(FIGURES_DIR / "downsampling_comparison.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
 
 def build_size_table():
@@ -88,9 +92,9 @@ def build_size_table():
             "full_nct_gb_float32": round(full_nct_count * features * 4 / 1e9, 2)
         })
     table = pd.DataFrame(rows)
-    table.to_csv(figures_dir / "representation_sizes.csv", index=False)
+    table.to_csv(FIGURES_DIR / "representation_sizes.csv", index=False)
     print(table.to_string(index=False))
-    average_kb = manifest["path"].apply(lambda p: os.path.getsize(data_dir / p)).mean() / 1e3
+    average_kb = manifest["path"].apply(lambda p: os.path.getsize(DATA_DIR / p)).mean() / 1e3
     print(f"Average original .tif size on disk: {average_kb:.1f} KB")
 
 build_pixel_matrices()

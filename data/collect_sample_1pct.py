@@ -1,5 +1,10 @@
 from itertools import chain
+from pathlib import Path
 from remotezip import RemoteZip
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+SAMPLE_DIR = DATA_DIR / "sample_1pct"
 
 def extract_nct_1pct():
     url = "https://zenodo.org/records/1214456/files/NCT-CRC-HE-100K.zip"
@@ -9,7 +14,7 @@ def extract_nct_1pct():
         infolist[20976:21092], infolist[32489:32605], infolist[44047:44136],
         infolist[52944:53080], infolist[66481:66569], infolist[75245:75350],
         infolist[85692:85836]):
-            zip.extract(zip_info.filename, path="./sample_1pct")
+            zip.extract(zip_info.filename, path=SAMPLE_DIR)
 
 def extract_val_1pct():
     url = "https://zenodo.org/records/1214456/files/CRC-VAL-HE-7K.zip"
@@ -19,7 +24,7 @@ def extract_val_1pct():
         infolist[2188:2192], infolist[2528:2535], infolist[3163:3174],
         infolist[4199:4205], infolist[4792:4800], infolist[5534:5539],
         infolist[5956:5969]):
-            zip.extract(zip_info.filename, path="./sample_1pct")
+            zip.extract(zip_info.filename, path=SAMPLE_DIR)
 
 extract_nct_1pct()
 extract_val_1pct()
