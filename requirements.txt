@@ -1,0 +1,13 @@
+matplotlib
+numpy
+pandas
+pillow
+pytest
+remotezip
+scikit-image
+scikit_learn
+scipy
+seaborn
+tifffile
+tqdm
+zenodo-get
